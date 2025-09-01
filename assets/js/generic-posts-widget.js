@@ -15,18 +15,18 @@ jQuery(document).ready(function($) {
         let settings = $wrapper.data('settings');
         let search = appliedFilters.search || '';
         
-        // Use applied filters instead of collecting from DOM
+        // Use applied filters
         let acfFilters = appliedFilters.acf || {};
         let taxFilters = appliedFilters.tax || {};
         let dateFrom = appliedFilters.dateFrom || '';
         let dateTo = appliedFilters.dateTo || '';
         
         // Debug logging
-        console.log('Sending to server:', { search, acfFilters, taxFilters, dateFrom, dateTo });
+        console.log('Loading posts with filters:', { search, acfFilters, taxFilters, dateFrom, dateTo });
         
         // Show loading state
         if (!append) {
-            $wrapper.find('.gpw-posts-grid').html('<div class="gpw-loading">Loading...</div>');
+            $wrapper.find('.gpw-posts-grid').html('<div class="gpw-loading">Loading posts...</div>');
         }
         
         $.ajax({
@@ -66,9 +66,17 @@ jQuery(document).ready(function($) {
                     
                     // Update results count
                     updateResultsCount($wrapper, res.data.found_posts);
+                    
+                    // Update field counts in accordion headers
+                    updateFieldCounts($wrapper);
+                } else {
+                    if (!append) {
+                        $wrapper.find('.gpw-posts-grid').html('<div class="gpw-error">Error: ' + (res.data || 'Unknown error') + '</div>');
+                    }
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
                 if (!append) {
                     $wrapper.find('.gpw-posts-grid').html('<div class="gpw-error">Error loading posts. Please try again.</div>');
                 }
@@ -178,8 +186,24 @@ jQuery(document).ready(function($) {
         if (foundPosts > 0) {
             $resultsCount.html('Found ' + foundPosts + ' post' + (foundPosts !== 1 ? 's' : ''));
         } else {
-            $resultsCount.html('');
+            $resultsCount.html('No posts found');
         }
+    }
+    
+    function updateFieldCounts($wrapper) {
+        $wrapper.find('.gpw-filters-accordion').each(function() {
+            let $accordion = $(this);
+            let $header = $accordion.find('.gpw-accordion-header h3');
+            let $checkboxes = $accordion.find('input[type="checkbox"]:checked');
+            let count = $checkboxes.length;
+            
+            let headerText = $header.text().replace(/\s*\d+$/, ''); // Remove existing count
+            if (count > 0) {
+                $header.html(headerText + ' <span class="gpw-field-count">' + count + '</span>');
+            } else {
+                $header.text(headerText);
+            }
+        });
     }
     
     function setupInfiniteScroll($wrapper) {
@@ -232,10 +256,10 @@ jQuery(document).ready(function($) {
             
             if ($content.is(':visible')) {
                 $content.slideUp(300);
-                $toggle.text('+');
+                $toggle.text('▼');
             } else {
                 $content.slideDown(300);
-                $toggle.text('-');
+                $toggle.text('▲');
             }
         });
     }
@@ -246,14 +270,18 @@ jQuery(document).ready(function($) {
             acf: {},
             tax: {},
             dateFrom: '',
-            dateTo: ''
+            dateTo: '',
+            search: ''
         };
+        
+        // Collect search term
+        filters.search = $wrapper.find('.gpw-search').val() || '';
         
         // Collect ACF filters
         $wrapper.find('.gpw-acf-filter').each(function() {
             let $field = $(this);
             let fieldName = $field.data('field');
-            let fieldType = $field.attr('type');
+            let fieldType = $field.attr('type') || 'select';
             
             if (fieldType === 'checkbox') {
                 if ($field.is(':checked')) {
@@ -278,7 +306,7 @@ jQuery(document).ready(function($) {
         $wrapper.find('.gpw-tax-filter').each(function() {
             let $field = $(this);
             let taxonomy = $field.data('taxonomy');
-            let fieldType = $field.attr('type');
+            let fieldType = $field.attr('type') || 'select';
             
             if (fieldType === 'checkbox') {
                 if ($field.is(':checked')) {
@@ -296,12 +324,10 @@ jQuery(document).ready(function($) {
         });
         
         // Collect date filters
-        filters.dateFrom = $wrapper.find('.gpw-date-filter-from').val();
-        filters.dateTo = $wrapper.find('.gpw-date-filter-to').val();
+        filters.dateFrom = $wrapper.find('.gpw-date-filter-from').val() || '';
+        filters.dateTo = $wrapper.find('.gpw-date-filter-to').val() || '';
         
-        // Debug logging
-        console.log('Collected filters:', filters);
-        
+        console.log('Collected pending filters:', filters);
         return filters;
     }
     
@@ -311,28 +337,41 @@ jQuery(document).ready(function($) {
         let $selectedFilters = $wrapper.find('.gpw-selected-filters');
         let $selectedTags = $wrapper.find('.gpw-selected-filters-tags');
         let $selectedCount = $wrapper.find('.gpw-selected-count');
+        let $actionButtons = $wrapper.find('.gpw-filter-actions');
         
         let selectedItems = [];
         let totalCount = 0;
+        
+        // Count search
+        if (filters.search && filters.search.trim() !== '') {
+            selectedItems.push({
+                type: 'search',
+                value: filters.search,
+                label: 'Search: "' + filters.search + '"'
+            });
+            totalCount++;
+        }
         
         // Count ACF filters
         Object.keys(filters.acf).forEach(fieldName => {
             if (Array.isArray(filters.acf[fieldName])) {
                 filters.acf[fieldName].forEach(value => {
-                    selectedItems.push({
-                        type: 'acf',
-                        field: fieldName,
-                        value: value,
-                        label: value
-                    });
-                    totalCount++;
+                    if (value && value.trim() !== '') {
+                        selectedItems.push({
+                            type: 'acf',
+                            field: fieldName,
+                            value: value,
+                            label: fieldName + ': ' + value
+                        });
+                        totalCount++;
+                    }
                 });
-            } else if (filters.acf[fieldName]) {
+            } else if (filters.acf[fieldName] && filters.acf[fieldName].trim() !== '') {
                 selectedItems.push({
                     type: 'acf',
                     field: fieldName,
                     value: filters.acf[fieldName],
-                    label: filters.acf[fieldName]
+                    label: fieldName + ': ' + filters.acf[fieldName]
                 });
                 totalCount++;
             }
@@ -344,21 +383,26 @@ jQuery(document).ready(function($) {
                 if (Array.isArray(filters.tax[taxonomy])) {
                     filters.tax[taxonomy].forEach(value => {
                         if (value && value.trim() !== '') {
+                            // Get term name for display
+                            let $option = $wrapper.find('.gpw-tax-filter[data-taxonomy="' + taxonomy + '"][value="' + value + '"]');
+                            let termName = $option.closest('label').text().trim() || value;
                             selectedItems.push({
                                 type: 'tax',
                                 taxonomy: taxonomy,
                                 value: value,
-                                label: value
+                                label: taxonomy + ': ' + termName
                             });
                             totalCount++;
                         }
                     });
                 } else if (filters.tax[taxonomy] && filters.tax[taxonomy].trim() !== '') {
+                    let $option = $wrapper.find('.gpw-tax-filter[data-taxonomy="' + taxonomy + '"][value="' + filters.tax[taxonomy] + '"]');
+                    let termName = $option.find('option:selected').text() || filters.tax[taxonomy];
                     selectedItems.push({
                         type: 'tax',
                         taxonomy: taxonomy,
                         value: filters.tax[taxonomy],
-                        label: filters.tax[taxonomy]
+                        label: taxonomy + ': ' + termName
                     });
                     totalCount++;
                 }
@@ -369,11 +413,11 @@ jQuery(document).ready(function($) {
         if (filters.dateFrom || filters.dateTo) {
             let dateLabel = '';
             if (filters.dateFrom && filters.dateTo) {
-                dateLabel = filters.dateFrom + ' - ' + filters.dateTo;
+                dateLabel = 'Date: ' + filters.dateFrom + ' - ' + filters.dateTo;
             } else if (filters.dateFrom) {
-                dateLabel = 'From ' + filters.dateFrom;
+                dateLabel = 'Date: From ' + filters.dateFrom;
             } else if (filters.dateTo) {
-                dateLabel = 'To ' + filters.dateTo;
+                dateLabel = 'Date: To ' + filters.dateTo;
             }
             
             selectedItems.push({
@@ -400,12 +444,17 @@ jQuery(document).ready(function($) {
         
         $selectedTags.html(tagsHtml);
         
-        // Show/hide selected filters section
+        // Show/hide selected filters section and action buttons
         if (totalCount > 0) {
             $selectedFilters.show();
+            $actionButtons.show();
         } else {
             $selectedFilters.hide();
+            $actionButtons.hide();
         }
+        
+        // Update field counts in accordion headers
+        updateFieldCounts($wrapper);
     }
     
     // Remove selected filter tag
@@ -415,16 +464,26 @@ jQuery(document).ready(function($) {
         let taxonomy = $tag.data('taxonomy');
         let value = $tag.data('value');
         
-        if (type === 'acf' && field) {
+        if (type === 'search') {
+            $wrapper.find('.gpw-search').val('');
+        } else if (type === 'acf' && field) {
             $wrapper.find('.gpw-acf-filter[data-field="' + field + '"]').each(function() {
                 if ($(this).val() === value) {
-                    $(this).prop('checked', false);
+                    if ($(this).attr('type') === 'checkbox' || $(this).attr('type') === 'radio') {
+                        $(this).prop('checked', false);
+                    } else {
+                        $(this).val('');
+                    }
                 }
             });
         } else if (type === 'tax' && taxonomy) {
             $wrapper.find('.gpw-tax-filter[data-taxonomy="' + taxonomy + '"]').each(function() {
                 if ($(this).val() === value) {
-                    $(this).prop('checked', false);
+                    if ($(this).attr('type') === 'checkbox') {
+                        $(this).prop('checked', false);
+                    } else {
+                        $(this).val('');
+                    }
                 }
             });
         } else if (type === 'date') {
@@ -439,12 +498,18 @@ jQuery(document).ready(function($) {
     function applyFilters($wrapper) {
         pendingFilters = collectPendingFilters($wrapper);
         appliedFilters = JSON.parse(JSON.stringify(pendingFilters)); // Deep copy
-        console.log('Applied filters:', appliedFilters);
+        console.log('Applying filters:', appliedFilters);
         loadPosts($wrapper, 1);
+        
+        // Hide action buttons after applying
+        $wrapper.find('.gpw-filter-actions').hide();
     }
     
     // Reset all filters
     function resetFilters($wrapper) {
+        // Clear search
+        $wrapper.find('.gpw-search').val('');
+        
         // Uncheck all checkboxes
         $wrapper.find('.gpw-acf-filter[type="checkbox"]').prop('checked', false);
         $wrapper.find('.gpw-tax-filter[type="checkbox"]').prop('checked', false);
@@ -461,7 +526,16 @@ jQuery(document).ready(function($) {
         $wrapper.find('.gpw-date-filter-to').val('');
         
         // Clear selects
-        $wrapper.find('.gpw-acf-filter[type="select"]').prop('selectedIndex', 0);
+        $wrapper.find('.gpw-acf-filter').each(function() {
+            if ($(this).is('select')) {
+                $(this).prop('selectedIndex', 0);
+            }
+        });
+        $wrapper.find('.gpw-tax-filter').each(function() {
+            if ($(this).is('select')) {
+                $(this).prop('selectedIndex', 0);
+            }
+        });
         
         // Clear applied filters
         appliedFilters = {};
@@ -491,8 +565,7 @@ jQuery(document).ready(function($) {
         let $wrapper = $(this);
         let settings = $wrapper.data('settings');
         
-        // Debug: Log settings
-        console.log('Widget settings:', settings);
+        console.log('Initializing widget with settings:', settings);
         
         // Initialize filters
         pendingFilters = {};
@@ -501,56 +574,26 @@ jQuery(document).ready(function($) {
         // Initial load
         loadPosts($wrapper, 1);
         
-        // Search handler with debounce
+        // Search handler with immediate search
         if (settings.show_search === 'yes') {
-            console.log('Setting up search handler');
-            let $searchInput = $wrapper.find('.gpw-search');
-            console.log('Search input found:', $searchInput.length > 0);
-            
-            if ($searchInput.length === 0) {
-                console.error('Search input not found!');
-                alert('Search input not found! Check if search is enabled in widget settings.');
-            }
-            
             let debouncedSearch = debounce(function() {
-                // Update the search term in applied filters
-                let searchTerm = $wrapper.find('.gpw-search').val();
-                appliedFilters.search = searchTerm;
-                console.log('Search term updated:', searchTerm);
-                
-                // Only search if there's a search term
-                if (searchTerm && searchTerm.trim() !== '') {
-                    loadPosts($wrapper, 1);
-                } else {
-                    // If search is empty, reset to show all posts
-                    appliedFilters.search = '';
-                    loadPosts($wrapper, 1);
-                }
-            }, 500);
+                updateSelectedFiltersDisplay($wrapper);
+            }, 300);
             
-            $wrapper.on('keyup', '.gpw-search', debouncedSearch);
-            
-            // Test search button
-            $wrapper.on('click', '.gpw-test-search', function() {
-                let searchTerm = $wrapper.find('.gpw-search').val() || 'test';
-                $wrapper.find('.gpw-search').val(searchTerm);
-                appliedFilters.search = searchTerm;
-                console.log('Test search triggered with term:', searchTerm);
-                loadPosts($wrapper, 1);
-            });
+            $wrapper.on('input keyup', '.gpw-search', debouncedSearch);
         }
         
-        // ACF filter handlers - update pending filters
+        // ACF filter handlers
         $wrapper.on('change', '.gpw-acf-filter', function() {
             updateSelectedFiltersDisplay($wrapper);
         });
         
-        // Taxonomy filter handlers - update pending filters
+        // Taxonomy filter handlers
         $wrapper.on('change', '.gpw-tax-filter', function() {
             updateSelectedFiltersDisplay($wrapper);
         });
         
-        // Date filter handlers - update pending filters
+        // Date filter handlers
         $wrapper.on('change', '.gpw-date-filter-from, .gpw-date-filter-to', function() {
             updateSelectedFiltersDisplay($wrapper);
         });
@@ -558,6 +601,7 @@ jQuery(document).ready(function($) {
         // Remove selected filter tag
         $wrapper.on('click', '.gpw-remove-tag', function(e) {
             e.preventDefault();
+            e.stopPropagation();
             removeSelectedFilter($wrapper, $(this).closest('.gpw-selected-tag'));
         });
         
@@ -595,10 +639,8 @@ jQuery(document).ready(function($) {
             setupInfiniteScroll($wrapper);
         }
         
-        // Setup accordion toggle if using accordion layout
-        if (settings.filters_layout === 'accordion') {
-            setupAccordionToggle($wrapper);
-        }
+        // Setup accordion toggle
+        setupAccordionToggle($wrapper);
     });
     
     // Setup mutation observer for each wrapper

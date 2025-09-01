@@ -98,31 +98,6 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
             'default' => 'yes',
         ] );
 
-        $this->add_control( 'show_confirm_button', [
-            'label'   => 'Show Confirm Button',
-            'type'    => \Elementor\Controls_Manager::SWITCHER,
-            'default' => 'yes',
-            'description' => 'Show confirm button to apply filters',
-        ] );
-
-        $this->add_control( 'confirm_button_text', [
-            'label'     => 'Confirm Button Text',
-            'type'      => \Elementor\Controls_Manager::TEXT,
-            'default'   => 'CONFIRM',
-            'condition' => [
-                'show_confirm_button' => 'yes',
-            ],
-        ] );
-
-        $this->add_control( 'reset_button_text', [
-            'label'     => 'Reset Button Text',
-            'type'      => \Elementor\Controls_Manager::TEXT,
-            'default'   => 'RESET ALL FILTERS',
-            'condition' => [
-                'show_confirm_button' => 'yes',
-            ],
-        ] );
-
         $this->add_control( 'search_placeholder', [
             'label'     => 'Search Placeholder',
             'type'      => \Elementor\Controls_Manager::TEXT,
@@ -161,9 +136,76 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
 
         $this->end_controls_section();
 
+        // ACF Filters Section
+        $this->start_controls_section( 'acf_filters_section', [
+            'label' => 'ACF Field Filters',
+            'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
+        ] );
 
+        $this->add_control( 'show_acf_filters', [
+            'label'   => 'Show ACF Field Filters',
+            'type'    => \Elementor\Controls_Manager::SWITCHER,
+            'default' => 'yes',
+        ] );
 
-        // Filters Section
+        $this->add_control( 'acf_fields', [
+            'label'     => 'ACF Fields to Display',
+            'type'      => \Elementor\Controls_Manager::REPEATER,
+            'fields'    => [
+                [
+                    'name'        => 'field_name',
+                    'label'       => 'Field Name',
+                    'type'        => \Elementor\Controls_Manager::TEXT,
+                    'description' => 'Enter the ACF field name (e.g., channels, tags)',
+                ],
+                [
+                    'name'        => 'field_label',
+                    'label'       => 'Field Label',
+                    'type'        => \Elementor\Controls_Manager::TEXT,
+                    'description' => 'Display label for the field',
+                ],
+                [
+                    'name'        => 'field_type',
+                    'label'       => 'Field Type',
+                    'type'        => \Elementor\Controls_Manager::SELECT,
+                    'options'     => [
+                        'text'     => 'Text Input',
+                        'select'   => 'Dropdown Select',
+                        'checkbox' => 'Checkbox Group',
+                        'radio'    => 'Radio Buttons',
+                        'date'     => 'Date Picker',
+                    ],
+                    'default'     => 'checkbox',
+                ],
+                [
+                    'name'        => 'get_options_from_acf',
+                    'label'       => 'Get Options from ACF Field',
+                    'type'        => \Elementor\Controls_Manager::SWITCHER,
+                    'default'     => 'yes',
+                    'description' => 'Automatically get options from ACF field choices',
+                    'condition'   => [
+                        'field_type' => ['select', 'checkbox', 'radio'],
+                    ],
+                ],
+                [
+                    'name'        => 'field_options',
+                    'label'       => 'Manual Field Options (one per line)',
+                    'type'        => \Elementor\Controls_Manager::TEXTAREA,
+                    'description' => 'Enter options one per line (only used if "Get Options from ACF Field" is disabled)',
+                    'condition'   => [
+                        'field_type' => ['select', 'checkbox', 'radio'],
+                        'get_options_from_acf' => '',
+                    ],
+                ],
+            ],
+            'condition' => [
+                'show_acf_filters' => 'yes',
+            ],
+        ] );
+
+        $this->end_controls_section();
+
+        // Additional Filters Section
         $this->start_controls_section( 'filters_section', [
             'label' => 'Additional Filters',
             'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
@@ -178,7 +220,7 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
         $this->add_control( 'date_filter_label', [
             'label'     => 'Date Filter Label',
             'type'      => \Elementor\Controls_Manager::TEXT,
-            'default'   => 'Published Date Range',
+            'default'   => 'DATE',
             'condition' => [
                 'show_date_filter' => 'yes',
             ],
@@ -205,7 +247,7 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
         $this->add_control( 'show_taxonomy_filters', [
             'label'   => 'Show Taxonomy Filters',
             'type'    => \Elementor\Controls_Manager::SWITCHER,
-            'default' => 'yes',
+            'default' => 'no',
         ] );
 
         $this->add_control( 'taxonomy_filters', [
@@ -230,53 +272,28 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
             ],
         ] );
 
-        $this->add_control( 'show_acf_filters', [
-            'label'   => 'Show ACF Field Filters',
+        $this->add_control( 'show_confirm_button', [
+            'label'   => 'Show Confirm Button',
             'type'    => \Elementor\Controls_Manager::SWITCHER,
             'default' => 'yes',
+            'description' => 'Show confirm button to apply filters',
         ] );
 
-        $this->add_control( 'acf_fields', [
-            'label'     => 'ACF Fields to Display',
-            'type'      => \Elementor\Controls_Manager::REPEATER,
-            'fields'    => [
-                [
-                    'name'        => 'field_name',
-                    'label'       => 'Field Name',
-                    'type'        => \Elementor\Controls_Manager::TEXT,
-                    'description' => 'Enter the ACF field name (e.g., location, category)',
-                ],
-                [
-                    'name'        => 'field_label',
-                    'label'       => 'Field Label',
-                    'type'        => \Elementor\Controls_Manager::TEXT,
-                    'description' => 'Display label for the field',
-                ],
-                [
-                    'name'        => 'field_type',
-                    'label'       => 'Field Type',
-                    'type'        => \Elementor\Controls_Manager::SELECT,
-                    'options'     => [
-                        'text'     => 'Text Input',
-                        'select'   => 'Dropdown Select',
-                        'checkbox' => 'Checkbox',
-                        'radio'    => 'Radio Buttons',
-                        'date'     => 'Date Picker',
-                    ],
-                    'default'     => 'select',
-                ],
-                [
-                    'name'        => 'field_options',
-                    'label'       => 'Field Options (one per line)',
-                    'type'        => \Elementor\Controls_Manager::TEXTAREA,
-                    'description' => 'For select/radio/checkbox fields, enter options one per line',
-                    'condition'   => [
-                        'field_type' => ['select', 'checkbox', 'radio'],
-                    ],
-                ],
-            ],
+        $this->add_control( 'confirm_button_text', [
+            'label'     => 'Confirm Button Text',
+            'type'      => \Elementor\Controls_Manager::TEXT,
+            'default'   => 'CONFIRM',
             'condition' => [
-                'show_acf_filters' => 'yes',
+                'show_confirm_button' => 'yes',
+            ],
+        ] );
+
+        $this->add_control( 'reset_button_text', [
+            'label'     => 'Reset Button Text',
+            'type'      => \Elementor\Controls_Manager::TEXT,
+            'default'   => 'RESET ALL FILTERS',
+            'condition' => [
+                'show_confirm_button' => 'yes',
             ],
         ] );
 
@@ -338,8 +355,6 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
             ],
             'default' => 'accordion',
         ] );
-
-
 
         $this->add_control( 'filters_spacing', [
             'label'      => 'Filters Spacing',
@@ -420,102 +435,46 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
             <?php if ( $settings['show_search'] === 'yes' ): ?>
                 <div class="gpw-search-wrapper">
                     <input type="text" class="gpw-search" placeholder="<?php echo esc_attr( $settings['search_placeholder'] ); ?>">
-                    <button type="button" class="gpw-test-search">Test Search</button>
                 </div>
             <?php endif; ?>
 
             <!-- Selected Filters Display -->
             <div class="gpw-selected-filters" style="display: none;">
                 <div class="gpw-selected-filters-header">
-                    <span class="gpw-filter-icon">⚏</span>
-                    <span class="gpw-selected-count">0</span> filters selected
+                    <span class="gpw-filter-icon">🔍</span>
+                    <span>Active Filters (<span class="gpw-selected-count">0</span>)</span>
                 </div>
                 <div class="gpw-selected-filters-tags"></div>
             </div>
 
+            <!-- Filters Section -->
             <?php if ( $settings['show_acf_filters'] === 'yes' || $settings['show_date_filter'] === 'yes' || ( $settings['show_taxonomy_filters'] === 'yes' && ! empty( $settings['taxonomy_filters'] ) ) ): ?>
-                <?php if ( $settings['filters_layout'] === 'accordion' ): ?>
-                    <!-- ACF Fields in Separate Accordions -->
-                    <?php if ( $settings['show_acf_filters'] === 'yes' && ! empty( $settings['acf_fields'] ) ): ?>
-                        <?php foreach ( $settings['acf_fields'] as $field ): ?>
-                            <div class="gpw-filters-accordion">
-                                <div class="gpw-accordion-header">
-                                    <h3><?php echo esc_html( $field['field_label'] ); ?></h3>
-                                    <span class="gpw-accordion-toggle">+</span>
-                                </div>
-                                <div class="gpw-accordion-content">
-                                    <div class="gpw-filter-item">
-                                        <?php echo $this->render_filter_field( $field ); ?>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <!-- Date Filter in Separate Accordion -->
-                    <?php if ( $settings['show_date_filter'] === 'yes' ): ?>
+                
+                <!-- ACF Fields Accordions -->
+                <?php if ( $settings['show_acf_filters'] === 'yes' && ! empty( $settings['acf_fields'] ) ): ?>
+                    <?php foreach ( $settings['acf_fields'] as $field ): ?>
                         <div class="gpw-filters-accordion">
                             <div class="gpw-accordion-header">
-                                <h3><?php echo esc_html( $settings['date_filter_label'] ); ?></h3>
-                                <span class="gpw-accordion-toggle">+</span>
+                                <h3><?php echo esc_html( strtoupper( $field['field_label'] ) ); ?> <span class="gpw-field-count"></span></h3>
+                                <span class="gpw-accordion-toggle">▼</span>
                             </div>
                             <div class="gpw-accordion-content">
-                                <div class="gpw-date-range">
-                                    <div class="gpw-date-input">
-                                        <label><?php echo esc_html( $settings['date_from_label'] ); ?></label>
-                                        <input type="date" class="gpw-date-filter-from">
-                                    </div>
-                                    <div class="gpw-date-input">
-                                        <label><?php echo esc_html( $settings['date_to_label'] ); ?></label>
-                                        <input type="date" class="gpw-date-filter-to">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-
-                    <!-- Taxonomy Filters in Separate Accordions -->
-                    <?php if ( $settings['show_taxonomy_filters'] === 'yes' && ! empty( $settings['taxonomy_filters'] ) ): ?>
-                        <?php foreach ( $settings['taxonomy_filters'] as $tax_filter ): ?>
-                            <div class="gpw-filters-accordion">
-                                <div class="gpw-accordion-header">
-                                    <h3><?php echo esc_html( $tax_filter['taxonomy_label'] ); ?></h3>
-                                    <span class="gpw-accordion-toggle">+</span>
-                                </div>
-                                <div class="gpw-accordion-content">
-                                    <div class="gpw-filter-item">
-                                        <div class="gpw-checkbox-group">
-                                            <label><input type="checkbox" class="gpw-tax-filter" data-taxonomy="<?php echo esc_attr( $tax_filter['taxonomy'] ); ?>" value="all"> All</label>
-                                            <?php echo $this->get_taxonomy_checkboxes( $tax_filter['taxonomy'] ); ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <!-- Confirm and Reset Buttons -->
-                    <?php if ( $settings['show_confirm_button'] === 'yes' ): ?>
-                        <div class="gpw-filter-actions">
-                            <button type="button" class="gpw-reset-filters"><?php echo esc_html( $settings['reset_button_text'] ); ?></button>
-                            <button type="button" class="gpw-confirm-filters"><?php echo esc_html( $settings['confirm_button_text'] ); ?></button>
-                        </div>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <?php if ( $settings['show_acf_filters'] === 'yes' && ! empty( $settings['acf_fields'] ) ): ?>
-                        <div class="gpw-filters gpw-filters-<?php echo esc_attr( $settings['filters_layout'] ); ?>">
-                            <?php foreach ( $settings['acf_fields'] as $field ): ?>
                                 <div class="gpw-filter-item">
-                                    <label><?php echo esc_html( $field['field_label'] ); ?></label>
-                                    <?php echo $this->render_filter_field( $field ); ?>
+                                    <?php echo $this->render_filter_field( $field, $settings['post_type'] ); ?>
                                 </div>
-                            <?php endforeach; ?>
+                            </div>
                         </div>
-                    <?php endif; ?>
+                    <?php endforeach; ?>
+                <?php endif; ?>
 
-                    <?php if ( $settings['show_date_filter'] === 'yes' ): ?>
-                        <div class="gpw-filter-item">
-                            <label><?php echo esc_html( $settings['date_filter_label'] ); ?></label>
+                <!-- Date Filter Accordion -->
+                <?php if ( $settings['show_date_filter'] === 'yes' ): ?>
+                    <div class="gpw-filters-accordion">
+                        <div class="gpw-accordion-header">
+                            <h3><?php echo esc_html( strtoupper( $settings['date_filter_label'] ) ); ?></h3>
+                            <span class="gpw-accordion-toggle">▼</span>
+                        </div>
+                        <div class="gpw-accordion-content">
                             <div class="gpw-date-range">
                                 <div class="gpw-date-input">
                                     <label><?php echo esc_html( $settings['date_from_label'] ); ?></label>
@@ -527,23 +486,35 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
                                 </div>
                             </div>
                         </div>
-                    <?php endif; ?>
-
-                    <?php if ( $settings['show_taxonomy_filters'] === 'yes' && ! empty( $settings['taxonomy_filters'] ) ): ?>
-                        <div class="gpw-filters gpw-filters-<?php echo esc_attr( $settings['filters_layout'] ); ?>">
-                            <?php foreach ( $settings['taxonomy_filters'] as $tax_filter ): ?>
-                                <div class="gpw-filter-item">
-                                    <label><?php echo esc_html( $tax_filter['taxonomy_label'] ); ?></label>
-                                    <select class="gpw-tax-filter" data-taxonomy="<?php echo esc_attr( $tax_filter['taxonomy'] ); ?>">
-                                        <option value="">All</option>
-                                        <?php echo $this->get_taxonomy_options( $tax_filter['taxonomy'] ); ?>
-                                    </select>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
+                    </div>
                 <?php endif; ?>
-                
+
+                <!-- Taxonomy Filters Accordions -->
+                <?php if ( $settings['show_taxonomy_filters'] === 'yes' && ! empty( $settings['taxonomy_filters'] ) ): ?>
+                    <?php foreach ( $settings['taxonomy_filters'] as $tax_filter ): ?>
+                        <div class="gpw-filters-accordion">
+                            <div class="gpw-accordion-header">
+                                <h3><?php echo esc_html( strtoupper( $tax_filter['taxonomy_label'] ) ); ?></h3>
+                                <span class="gpw-accordion-toggle">▼</span>
+                            </div>
+                            <div class="gpw-accordion-content">
+                                <div class="gpw-filter-item">
+                                    <div class="gpw-checkbox-group">
+                                        <?php echo $this->get_taxonomy_checkboxes( $tax_filter['taxonomy'] ); ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+
+                <!-- Action Buttons -->
+                <?php if ( $settings['show_confirm_button'] === 'yes' ): ?>
+                    <div class="gpw-filter-actions" style="display: none;">
+                        <button type="button" class="gpw-reset-filters"><?php echo esc_html( $settings['reset_button_text'] ); ?></button>
+                        <button type="button" class="gpw-confirm-filters"><?php echo esc_html( $settings['confirm_button_text'] ); ?></button>
+                    </div>
+                <?php endif; ?>
 
             <?php endif; ?>
 
@@ -558,37 +529,52 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
         <?php
     }
 
-    private function render_filter_field( $field ) {
+    private function render_filter_field( $field, $post_type ) {
         $field_name = $field['field_name'];
         $field_type = $field['field_type'];
+        $get_from_acf = $field['get_options_from_acf'] === 'yes';
         $options = [];
 
-        if ( ! empty( $field['field_options'] ) ) {
-            $options = array_filter( array_map( 'trim', explode( "\n", $field['field_options'] ) ) );
+        // Get options from ACF field or manual input
+        if ( $get_from_acf && function_exists( 'get_field_object' ) ) {
+            // Try to get field object from ACF
+            $acf_field = get_field_object( $field_name );
+            if ( $acf_field && isset( $acf_field['choices'] ) ) {
+                $options = $acf_field['choices'];
+            } else {
+                // Fallback: get unique values from posts
+                $options = $this->get_acf_field_values( $field_name, $post_type );
+            }
+        } else if ( ! empty( $field['field_options'] ) ) {
+            $manual_options = array_filter( array_map( 'trim', explode( "\n", $field['field_options'] ) ) );
+            foreach ( $manual_options as $option ) {
+                $options[ $option ] = $option;
+            }
         }
 
         switch ( $field_type ) {
             case 'select':
                 $html = '<select class="gpw-acf-filter" data-field="' . esc_attr( $field_name ) . '">';
                 $html .= '<option value="">All</option>';
-                foreach ( $options as $option ) {
-                    $html .= '<option value="' . esc_attr( $option ) . '">' . esc_html( $option ) . '</option>';
+                foreach ( $options as $value => $label ) {
+                    $html .= '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
                 }
                 $html .= '</select>';
                 return $html;
 
             case 'checkbox':
                 $html = '<div class="gpw-checkbox-group">';
-                foreach ( $options as $option ) {
-                    $html .= '<label><input type="checkbox" class="gpw-acf-filter" data-field="' . esc_attr( $field_name ) . '" value="' . esc_attr( $option ) . '"> ' . esc_html( $option ) . '</label>';
+                foreach ( $options as $value => $label ) {
+                    $html .= '<label><input type="checkbox" class="gpw-acf-filter" data-field="' . esc_attr( $field_name ) . '" value="' . esc_attr( $value ) . '"> ' . esc_html( $label ) . '</label>';
                 }
                 $html .= '</div>';
                 return $html;
 
             case 'radio':
                 $html = '<div class="gpw-radio-group">';
-                foreach ( $options as $option ) {
-                    $html .= '<label><input type="radio" name="gpw_' . esc_attr( $field_name ) . '" class="gpw-acf-filter" data-field="' . esc_attr( $field_name ) . '" value="' . esc_attr( $option ) . '"> ' . esc_html( $option ) . '</label>';
+                $html .= '<label><input type="radio" name="gpw_' . esc_attr( $field_name ) . '" class="gpw-acf-filter" data-field="' . esc_attr( $field_name ) . '" value=""> All</label>';
+                foreach ( $options as $value => $label ) {
+                    $html .= '<label><input type="radio" name="gpw_' . esc_attr( $field_name ) . '" class="gpw-acf-filter" data-field="' . esc_attr( $field_name ) . '" value="' . esc_attr( $value ) . '"> ' . esc_html( $label ) . '</label>';
                 }
                 $html .= '</div>';
                 return $html;
@@ -599,6 +585,42 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
             default:
                 return '<input type="text" class="gpw-acf-filter" data-field="' . esc_attr( $field_name ) . '" placeholder="Enter ' . esc_attr( $field['field_label'] ) . '">';
         }
+    }
+
+    private function get_acf_field_values( $field_name, $post_type ) {
+        global $wpdb;
+        
+        $values = $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT pm.meta_value 
+             FROM {$wpdb->postmeta} pm 
+             INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
+             WHERE pm.meta_key = %s 
+             AND p.post_type = %s 
+             AND p.post_status = 'publish' 
+             AND pm.meta_value != '' 
+             ORDER BY pm.meta_value",
+            $field_name,
+            $post_type
+        ) );
+        
+        $options = [];
+        foreach ( $values as $value ) {
+            // Handle serialized arrays (for checkbox fields)
+            if ( is_serialized( $value ) ) {
+                $unserialized = maybe_unserialize( $value );
+                if ( is_array( $unserialized ) ) {
+                    foreach ( $unserialized as $item ) {
+                        if ( ! empty( $item ) ) {
+                            $options[ $item ] = $item;
+                        }
+                    }
+                }
+            } else if ( ! empty( $value ) ) {
+                $options[ $value ] = $value;
+            }
+        }
+        
+        return $options;
     }
 
     private function get_post_types() {
@@ -664,6 +686,4 @@ class Generic_Posts_Widget extends \Elementor\Widget_Base {
         }
         return $html;
     }
-
-
 }

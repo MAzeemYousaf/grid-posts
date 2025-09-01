@@ -50,180 +50,170 @@ function gpw_filter_posts() {
     $search_term    = sanitize_text_field( $_POST['search'] ?? '' );
     $acf_filters    = $_POST['acf_filters'] ?? [];
     $tax_filters    = $_POST['tax_filters'] ?? [];
-    $date_from      = $_POST['date_from'] ?? '';
-    $date_to        = $_POST['date_to'] ?? '';
+    $date_from      = sanitize_text_field( $_POST['date_from'] ?? '' );
+    $date_to        = sanitize_text_field( $_POST['date_to'] ?? '' );
     $template_id    = intval( $_POST['template_id'] ?? 0 );
     $search_in_title = $_POST['search_in_title'] ?? 'yes';
     $search_in_content = $_POST['search_in_content'] ?? 'yes';
     $search_in_acf = $_POST['search_in_acf'] ?? 'yes';
     
-    // Debug: Log all POST data
-    error_log('GPW POST Data: ' . print_r($_POST, true));
-    error_log('GPW Search Term: ' . $search_term);
+    // Debug logging
+    error_log('GPW AJAX Request - Search Term: ' . $search_term);
+    error_log('GPW AJAX Request - ACF Filters: ' . print_r($acf_filters, true));
+    error_log('GPW AJAX Request - Tax Filters: ' . print_r($tax_filters, true));
 
-    // Build meta query for ACF fields
-    $meta_query = [];
+    // Build the query arguments
+    $args = [
+        'post_type'      => $post_type,
+        'posts_per_page' => $posts_per_page,
+        'paged'          => $paged,
+        'post_status'    => 'publish',
+        'meta_query'     => [],
+        'tax_query'      => [],
+        'date_query'     => []
+    ];
+
+    // Handle search functionality
+    if ( ! empty( $search_term ) ) {
+        $search_queries = [];
+        
+        // Search in title and content (WordPress default)
+        if ( $search_in_title === 'yes' || $search_in_content === 'yes' ) {
+            $args['s'] = $search_term;
+        }
+        
+        // Search in ACF fields
+        if ( $search_in_acf === 'yes' && function_exists( 'get_field_objects' ) ) {
+            $acf_search_query = [];
+            $acf_search_query['relation'] = 'OR';
+            
+            // Get all ACF fields for this post type
+            $sample_posts = get_posts([
+                'post_type' => $post_type,
+                'posts_per_page' => 10,
+                'post_status' => 'publish'
+            ]);
+            
+            $acf_field_names = [];
+            foreach ( $sample_posts as $post ) {
+                $fields = get_field_objects( $post->ID );
+                if ( $fields ) {
+                    foreach ( $fields as $field ) {
+                        $acf_field_names[] = $field['name'];
+                    }
+                }
+            }
+            
+            // Remove duplicates
+            $acf_field_names = array_unique( $acf_field_names );
+            
+            // Add search conditions for each ACF field
+            foreach ( $acf_field_names as $field_name ) {
+                $acf_search_query[] = [
+                    'key'     => $field_name,
+                    'value'   => $search_term,
+                    'compare' => 'LIKE'
+                ];
+            }
+            
+            if ( ! empty( $acf_search_query ) && count( $acf_search_query ) > 1 ) {
+                $args['meta_query'][] = $acf_search_query;
+            }
+        }
+    }
+
+    // Build meta query for ACF field filters
     if ( ! empty( $acf_filters ) ) {
         foreach ( $acf_filters as $key => $val ) {
             if ( ! empty( $val ) ) {
+                $key = sanitize_text_field( $key );
+                
                 if ( is_array( $val ) ) {
-                    // Handle checkbox/radio groups
-                    $meta_query[] = [
-                        'key'     => sanitize_text_field( $key ),
-                        'value'   => $val,
-                        'compare' => 'IN'
-                    ];
+                    // Handle checkbox/radio groups - filter out empty values
+                    $val = array_filter( array_map( 'sanitize_text_field', $val ) );
+                    if ( ! empty( $val ) ) {
+                        $args['meta_query'][] = [
+                            'key'     => $key,
+                            'value'   => $val,
+                            'compare' => 'IN'
+                        ];
+                    }
                 } else {
-                    $meta_query[] = [
-                        'key'     => sanitize_text_field( $key ),
-                        'value'   => sanitize_text_field( $val ),
-                        'compare' => 'LIKE'
-                    ];
+                    $val = sanitize_text_field( $val );
+                    if ( $val !== '' ) {
+                        $args['meta_query'][] = [
+                            'key'     => $key,
+                            'value'   => $val,
+                            'compare' => 'LIKE'
+                        ];
+                    }
                 }
             }
         }
     }
-    
-    // Debug logging
-    error_log('GPW ACF Filters: ' . print_r($acf_filters, true));
-    error_log('GPW Meta Query: ' . print_r($meta_query, true));
 
     // Build taxonomy query
-    $tax_query = [];
     if ( ! empty( $tax_filters ) ) {
-        foreach ( $tax_filters as $taxonomy => $term_id ) {
-            if ( ! empty( $term_id ) ) {
-                $tax_query[] = [
-                    'taxonomy' => sanitize_text_field( $taxonomy ),
-                    'field'    => 'term_id',
-                    'terms'    => intval( $term_id )
-                ];
+        foreach ( $tax_filters as $taxonomy => $term_ids ) {
+            if ( ! empty( $term_ids ) ) {
+                $taxonomy = sanitize_text_field( $taxonomy );
+                
+                if ( is_array( $term_ids ) ) {
+                    $term_ids = array_filter( array_map( 'intval', $term_ids ) );
+                    if ( ! empty( $term_ids ) ) {
+                        $args['tax_query'][] = [
+                            'taxonomy' => $taxonomy,
+                            'field'    => 'term_id',
+                            'terms'    => $term_ids,
+                            'operator' => 'IN'
+                        ];
+                    }
+                } else {
+                    $term_id = intval( $term_ids );
+                    if ( $term_id > 0 ) {
+                        $args['tax_query'][] = [
+                            'taxonomy' => $taxonomy,
+                            'field'    => 'term_id',
+                            'terms'    => $term_id
+                        ];
+                    }
+                }
             }
         }
     }
 
     // Build date query
-    $date_query = [];
     if ( ! empty( $date_from ) || ! empty( $date_to ) ) {
         $date_args = [];
         
         if ( ! empty( $date_from ) ) {
-            $date_args['after'] = sanitize_text_field( $date_from );
+            $date_args['after'] = $date_from;
             $date_args['inclusive'] = true;
         }
         
         if ( ! empty( $date_to ) ) {
-            $date_args['before'] = sanitize_text_field( $date_to );
+            $date_args['before'] = $date_to;
             $date_args['inclusive'] = true;
         }
         
         if ( ! empty( $date_args ) ) {
-            $date_query[] = $date_args;
+            $args['date_query'][] = $date_args;
         }
     }
 
-    // Build search query
-    $search_meta_query = [];
-    if ( ! empty( $search_term ) ) {
-        if ( $search_in_acf === 'yes' && function_exists( 'get_fields' ) ) {
-            // Search in ACF fields
-            $acf_search_query = [];
-            $acf_search_query['relation'] = 'OR';
-            
-                // Get all ACF field keys for the post type
-    $acf_fields = get_field_objects( $post_type );
-    if ( $acf_fields ) {
-        foreach ( $acf_fields as $field ) {
-            $acf_search_query[] = [
-                'key'     => $field['name'],
-                'value'   => $search_term,
-                'compare' => 'LIKE'
-            ];
-        }
-    } else {
-        // Fallback: try to get ACF fields from any post of this type
-        $sample_post = get_posts([
-            'post_type' => $post_type,
-            'posts_per_page' => 1,
-            'post_status' => 'publish'
-        ]);
-        
-        if (!empty($sample_post)) {
-            $acf_fields = get_fields($sample_post[0]->ID);
-            if ($acf_fields) {
-                foreach ($acf_fields as $field_name => $field_value) {
-                    $acf_search_query[] = [
-                        'key'     => $field_name,
-                        'value'   => $search_term,
-                        'compare' => 'LIKE'
-                    ];
-                }
-            }
-        }
-    }
-            
-            if ( ! empty( $acf_search_query ) ) {
-                $search_meta_query[] = $acf_search_query;
-            }
-        }
-    }
-    
-    // Debug logging for search
-    error_log('GPW Search Term: ' . $search_term);
-    error_log('GPW Search Meta Query: ' . print_r($search_meta_query, true));
-    error_log('GPW ACF Fields Found: ' . print_r($acf_fields, true));
-    error_log('GPW Search In Title: ' . $search_in_title);
-    error_log('GPW Search In Content: ' . $search_in_content);
-    error_log('GPW Search In ACF: ' . $search_in_acf);
-
-    // Combine all queries
-    $args = [
-        'post_type'      => $post_type,
-        'posts_per_page' => $posts_per_page,
-        'paged'          => $paged,
-        'meta_query'     => $meta_query,
-        'tax_query'      => $tax_query,
-        'date_query'     => $date_query,
-    ];
-
-    // Handle search
-    if ( ! empty( $search_term ) ) {
-        // Use WordPress default search for title and content
-        $args['s'] = $search_term;
-        
-        // Add ACF field search to meta query if needed
-        if ( ! empty( $search_meta_query ) ) {
-            if ( ! empty( $args['meta_query'] ) ) {
-                $args['meta_query']['relation'] = 'AND';
-                $args['meta_query'][] = [
-                    'relation' => 'OR',
-                    $search_meta_query
-                ];
-            } else {
-                $args['meta_query'] = $search_meta_query;
-            }
-        }
-        
-        // Debug: Log search args
-        error_log('GPW Search Args: s=' . $args['s'] . ', meta_query=' . print_r($args['meta_query'], true));
-    }
-    
-    // Debug logging for final query
-    error_log('GPW Final Args: ' . print_r($args, true));
-    error_log('GPW Search Term in Args: ' . (isset($args['s']) ? $args['s'] : 'NOT SET'));
-
-    // Set relation for meta queries if we have multiple
+    // Set relations for multiple queries
     if ( count( $args['meta_query'] ) > 1 ) {
         $args['meta_query']['relation'] = 'AND';
     }
 
-    // Set relation for tax queries if we have multiple
     if ( count( $args['tax_query'] ) > 1 ) {
         $args['tax_query']['relation'] = 'AND';
     }
 
+    // Debug: Log final query args
+    error_log('GPW Final Query Args: ' . print_r($args, true));
 
-
+    // Execute the query
     $query = new WP_Query( $args );
 
     if ( $query->have_posts() ) {
@@ -237,9 +227,9 @@ function gpw_filter_posts() {
                 echo '<h3><a href="' . get_permalink() . '">' . get_the_title() . '</a></h3>';
                 echo '<div class="gpw-excerpt">' . get_the_excerpt() . '</div>';
                 echo '<div class="gpw-meta">';
-                echo '<span class="gpw-date">' . get_the_date() . '</span>';
+                echo '<span class="gpw-date">📅 ' . get_the_date() . '</span>';
                 if ( has_category() ) {
-                    echo '<span class="gpw-categories">' . get_the_category_list( ', ' ) . '</span>';
+                    echo '<span class="gpw-categories">🏷️ ' . get_the_category_list( ', ' ) . '</span>';
                 }
                 echo '</div>';
                 echo '</div>';
@@ -249,16 +239,16 @@ function gpw_filter_posts() {
         $html = ob_get_clean();
 
         wp_send_json_success([
-            'html'       => $html,
-            'max_pages'  => $query->max_num_pages,
-            'found_posts' => $query->found_posts,
+            'html'         => $html,
+            'max_pages'    => $query->max_num_pages,
+            'found_posts'  => $query->found_posts,
             'current_page' => $paged
         ]);
     } else {
         wp_send_json_success([
-            'html' => '<p class="gpw-no-posts">No posts found matching your criteria.</p>',
-            'max_pages' => 0,
-            'found_posts' => 0,
+            'html'         => '<div class="gpw-no-posts">No posts found matching your criteria.</div>',
+            'max_pages'    => 0,
+            'found_posts'  => 0,
             'current_page' => $paged
         ]);
     }
